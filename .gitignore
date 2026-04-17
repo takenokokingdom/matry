@@ -1,0 +1,19 @@
+node_modules
+.pnpm-store
+
+# Next.js
+apps/web/.next
+apps/web/out
+
+# Expo
+apps/mobile/.expo
+apps/mobile/dist
+
+# env
+.env
+.env.local
+.env*.local
+
+# misc
+.DS_Store
+*.log

@@ -47,51 +47,48 @@ export default function ChatScreen() {
       { id: assistantId, role: "assistant", content: "", streaming: true },
     ]);
 
-    try {
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/api/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        },
-      );
-
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
+    await new Promise<void>((resolve) => {
+      const xhr = new XMLHttpRequest();
       let accumulated = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
+      xhr.open("POST", `${process.env.EXPO_PUBLIC_API_URL}/api/generate`);
+      xhr.setRequestHeader("Content-Type", "application/json");
+
+      xhr.onprogress = () => {
+        accumulated = xhr.responseText;
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, content: accumulated } : m,
           ),
         );
         flatListRef.current?.scrollToEnd({ animated: true });
-      }
+      };
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, streaming: false } : m,
-        ),
-      );
-      setPreviewCode(accumulated);
-    } catch (e) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: "エラーが発生しました。", streaming: false }
-            : m,
-        ),
-      );
-    } finally {
-      setLoading(false);
-    }
+      xhr.onload = () => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, streaming: false } : m,
+          ),
+        );
+        setPreviewCode(accumulated);
+        setLoading(false);
+        resolve();
+      };
+
+      xhr.onerror = () => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: "エラーが発生しました。", streaming: false }
+              : m,
+          ),
+        );
+        setLoading(false);
+        resolve();
+      };
+
+      xhr.send(JSON.stringify({ message: text }));
+    });
   };
 
   return (

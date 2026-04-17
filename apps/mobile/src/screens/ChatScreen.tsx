@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import PreviewScreen from "./PreviewScreen";
 
 type Message = {
   id: string;
@@ -22,6 +24,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const sendMessage = async () => {
@@ -77,6 +80,7 @@ export default function ChatScreen() {
           m.id === assistantId ? { ...m, streaming: false } : m,
         ),
       );
+      setPreviewCode(accumulated);
     } catch (e) {
       setMessages((prev) =>
         prev.map((m) =>
@@ -94,6 +98,14 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Matry</Text>
+        {previewCode && !loading && (
+          <Pressable
+            style={styles.previewButton}
+            onPress={() => setPreviewCode(previewCode)}
+          >
+            <Text style={styles.previewButtonText}>▶ プレビュー</Text>
+          </Pressable>
+        )}
       </View>
       <KeyboardAvoidingView
         style={styles.flex}
@@ -144,6 +156,15 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={!!previewCode} animationType="slide">
+        {previewCode && (
+          <PreviewScreen
+            code={previewCode}
+            onClose={() => setPreviewCode(null)}
+          />
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -152,12 +173,22 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: "#fff" },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
+  previewButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  previewButtonText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   messageList: { padding: 16, gap: 12 },
   bubble: {
     maxWidth: "80%",

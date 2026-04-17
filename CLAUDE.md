@@ -70,10 +70,10 @@ Next.js API Routesで手書きしたループ — エージェントフレーム
 ### ブランチ戦略（GitHub Flow）
 
 - `main` = 本番相当。直接pushしない。
-- ブランチ命名はIssueラベルに対応させる:
-  - `feature/xxx` — 新機能
-  - `bug/xxx` — 不具合修正
-  - `task/xxx` — 設定・調査・リファクタなど
+- ブランチ命名はIssueラベルとIssue番号を含める:
+  - `feature/{issue番号}-xxx` — 新機能
+  - `bug/{issue番号}-xxx` — 不具合修正
+  - `task/{issue番号}-xxx` — 設定・調査・リファクタなど
 - PRを出すとVercelがプレビューURLを自動発行（ステージング相当）。
 - レビュー・確認OKでmainにマージ → 本番に自動デプロイ。
 - ユーザーが増えてきたら慎重なフローに移行する。

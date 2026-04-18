@@ -46,11 +46,9 @@ export default function CodeGeneratingIndicator({ content }: Props) {
           { opacity: shimmerOpacity, backgroundColor: "#fff", borderRadius: 8 },
         ]}
       />
-      <View style={styles.lines}>
-        {([75, 50] as const).map((w) => (
-          <View key={w} style={[styles.skeletonLine, { width: `${w}%` }]} />
-        ))}
-      </View>
+      <View style={styles.skeletonLine} />
+      <View style={[styles.skeletonLine, { width: "55%" }]} />
+      <View style={styles.divider} />
       <View style={styles.lastLineRow}>
         <Text style={styles.lastLineText} numberOfLines={1}>
           {lastLine}
@@ -64,25 +62,26 @@ export default function CodeGeneratingIndicator({ content }: Props) {
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    height: 100,
     backgroundColor: "#1e1e1e",
     borderRadius: 8,
     padding: 12,
-    justifyContent: "space-between",
+    gap: 8,
     overflow: "hidden",
   },
-  lines: { flex: 1, justifyContent: "space-around", paddingBottom: 6 },
   skeletonLine: {
     height: 8,
+    width: "75%",
     backgroundColor: "#3a3a3a",
     borderRadius: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#333",
+    marginVertical: 2,
   },
   lastLineRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#333",
-    paddingTop: 6,
   },
   lastLineText: {
     flex: 1,

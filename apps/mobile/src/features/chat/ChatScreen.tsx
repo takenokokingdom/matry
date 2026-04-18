@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
-  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -12,7 +11,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import PreviewScreen from "./PreviewScreen";
+import { isGeneratedCode } from "../../shared/lib/code/detect";
+import PreviewScreen from "../preview/PreviewScreen";
+import { generateApp } from "./api/generate";
+import GeneratingIndicator from "./components/GeneratingIndicator";
 
 type Message = {
   id: string;
@@ -20,73 +22,6 @@ type Message = {
   content: string;
   streaming?: boolean;
 };
-
-const isGeneratedCode = (text: string) => text.includes("function App");
-
-function GeneratingIndicator() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animate = (dot: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(dot, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]),
-      );
-    const a1 = animate(dot1, 0);
-    const a2 = animate(dot2, 150);
-    const a3 = animate(dot3, 300);
-    a1.start();
-    a2.start();
-    a3.start();
-    return () => {
-      a1.stop();
-      a2.stop();
-      a3.stop();
-    };
-  }, [dot1, dot2, dot3]);
-
-  const dotStyle = (dot: Animated.Value) => ({
-    opacity: dot,
-    transform: [
-      {
-        translateY: dot.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -4],
-        }),
-      },
-    ],
-  });
-
-  return (
-    <View style={styles.generatingRow}>
-      <Text style={styles.generatingLabel}>生成中</Text>
-      {(
-        [
-          ["d1", dot1],
-          ["d2", dot2],
-          ["d3", dot3],
-        ] as const
-      ).map(([key, dot]) => (
-        <Animated.Text key={key} style={[styles.dot, dotStyle(dot)]}>
-          ●
-        </Animated.Text>
-      ))}
-    </View>
-  );
-}
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -96,7 +31,7 @@ export default function ChatScreen() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     const text = input.trim();
     if (!text || loading) return;
 
@@ -117,15 +52,8 @@ export default function ChatScreen() {
       { id: assistantId, role: "assistant", content: "", streaming: true },
     ]);
 
-    await new Promise<void>((resolve) => {
-      const xhr = new XMLHttpRequest();
-      let accumulated = "";
-
-      xhr.open("POST", `${process.env.EXPO_PUBLIC_API_URL}/api/generate`);
-      xhr.setRequestHeader("Content-Type", "application/json");
-
-      xhr.onprogress = () => {
-        accumulated = xhr.responseText;
+    generateApp(text, {
+      onProgress: (accumulated) => {
         if (!isGeneratedCode(accumulated)) {
           setMessages((prev) =>
             prev.map((m) =>
@@ -134,9 +62,8 @@ export default function ChatScreen() {
           );
           flatListRef.current?.scrollToEnd({ animated: true });
         }
-      };
-
-      xhr.onload = () => {
+      },
+      onDone: (accumulated) => {
         setGeneratingId(null);
         if (isGeneratedCode(accumulated)) {
           setMessages((prev) =>
@@ -155,10 +82,8 @@ export default function ChatScreen() {
           );
         }
         setLoading(false);
-        resolve();
-      };
-
-      xhr.onerror = () => {
+      },
+      onError: () => {
         setGeneratingId(null);
         setMessages((prev) =>
           prev.map((m) =>
@@ -168,10 +93,7 @@ export default function ChatScreen() {
           ),
         );
         setLoading(false);
-        resolve();
-      };
-
-      xhr.send(JSON.stringify({ message: text }));
+      },
     });
   };
 
@@ -285,13 +207,6 @@ const styles = StyleSheet.create({
   aiBubble: { alignSelf: "flex-start", backgroundColor: "#F0F0F0" },
   userText: { color: "#fff", fontSize: 15 },
   aiText: { color: "#000", fontSize: 15 },
-  generatingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  generatingLabel: { fontSize: 14, color: "#555" },
-  dot: { fontSize: 8, color: "#555" },
   inputRow: {
     flexDirection: "row",
     padding: 12,

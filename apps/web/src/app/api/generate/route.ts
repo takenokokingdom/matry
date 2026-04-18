@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
+import { supabase } from "../../../lib/supabase/client";
 
 const anthropic = new Anthropic();
 
@@ -30,6 +31,22 @@ function App() {
 const MAX_RETRIES = 3;
 
 export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  if (!token) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser(token);
+
+  if (authError || !user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const { message, history = [] } = await req.json();
 
   const messages: Anthropic.MessageParam[] = [

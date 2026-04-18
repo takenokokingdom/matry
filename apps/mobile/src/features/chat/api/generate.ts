@@ -1,3 +1,5 @@
+import { supabase } from "../../../shared/lib/supabase/client";
+
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 type GenerateCallbacks = {
@@ -6,15 +8,26 @@ type GenerateCallbacks = {
   onError: () => void;
 };
 
-export function generateApp(
+export async function generateApp(
   message: string,
   { onProgress, onDone, onError }: GenerateCallbacks,
-): void {
+): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const token = session?.access_token;
+  if (!token) {
+    onError();
+    return;
+  }
+
   const xhr = new XMLHttpRequest();
   let accumulated = "";
 
   xhr.open("POST", `${API_URL}/api/generate`);
   xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
   xhr.onprogress = () => {
     accumulated = xhr.responseText;

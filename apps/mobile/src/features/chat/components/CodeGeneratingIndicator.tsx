@@ -6,24 +6,24 @@ type Props = {
 };
 
 export default function CodeGeneratingIndicator({ content }: Props) {
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 1,
+        Animated.timing(pulse, {
+          toValue: 0.6,
           duration: 900,
           useNativeDriver: true,
         }),
-        Animated.timing(shimmer, {
-          toValue: 0,
+        Animated.timing(pulse, {
+          toValue: 1,
           duration: 900,
           useNativeDriver: true,
         }),
       ]),
     ).start();
-  }, [shimmer]);
+  }, [pulse]);
 
   const codeStart = content.indexOf("function App");
   const code = codeStart >= 0 ? content.slice(codeStart) : content;
@@ -33,25 +33,16 @@ export default function CodeGeneratingIndicator({ content }: Props) {
       .filter((l) => l.trim())
       .at(-1) ?? "";
 
-  const shimmerOpacity = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.06, 0.18],
-  });
-
   return (
     <View style={styles.container}>
+      <Animated.View style={[styles.skeletonLine, { opacity: pulse }]} />
       <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { opacity: shimmerOpacity, backgroundColor: "#fff", borderRadius: 8 },
-        ]}
+        style={[styles.skeletonLine, { width: "55%", opacity: pulse }]}
       />
-      <View style={styles.skeletonLine} />
-      <View style={[styles.skeletonLine, { width: "55%" }]} />
       <View style={styles.divider} />
       <View style={styles.lastLineRow}>
         <Text style={styles.lastLineText} numberOfLines={1}>
-          {lastLine}
+          {lastLine || "生成中..."}
         </Text>
         <Text style={styles.cursor}>▍</Text>
       </View>
@@ -66,7 +57,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     gap: 8,
-    overflow: "hidden",
   },
   skeletonLine: {
     height: 8,
@@ -77,11 +67,11 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#333",
-    marginVertical: 2,
   },
   lastLineRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 2,
   },
   lastLineText: {
     flex: 1,

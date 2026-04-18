@@ -2,6 +2,8 @@ import { supabase } from "../../../shared/lib/supabase/client";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
+export type HistoryItem = { role: "user" | "assistant"; content: string };
+
 type GenerateCallbacks = {
   onProgress: (text: string) => void;
   onDone: (text: string) => void;
@@ -10,6 +12,7 @@ type GenerateCallbacks = {
 
 export async function generateApp(
   message: string,
+  history: HistoryItem[],
   { onProgress, onDone, onError }: GenerateCallbacks,
 ): Promise<void> {
   const {
@@ -42,5 +45,5 @@ export async function generateApp(
     onError();
   };
 
-  xhr.send(JSON.stringify({ message }));
+  xhr.send(JSON.stringify({ message, history }));
 }

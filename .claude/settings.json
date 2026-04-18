@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/takenokoman/projects/matry/.claude/hooks/biome-fix.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

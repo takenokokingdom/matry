@@ -3,15 +3,29 @@ import type { NextRequest } from "next/server";
 
 const anthropic = new Anthropic();
 
-const SYSTEM_PROMPT = `あなたはReact Nativeアプリを生成するAIです。
-ユーザーの指示に従い、React NativeのJSXコードを生成してください。
+const SYSTEM_PROMPT = `あなたはスマホアプリのUIをReactで生成するAIです。
+生成したコードはWebView + Babel standaloneのサンドボックスで動作します。
 
-以下のルールを守ること：
+以下のルールを必ず守ること：
 - コンポーネント名は必ず "App" にする
-- import文は react と react-native のみ使用可能
-- export default でコンポーネントをエクスポートする
-- スタイルはStyleSheetを使う
-- コードブロック（\`\`\`）は使わず、コードのみを返す`;
+- importは一切書かない（React・ReactDOMはグローバルで利用可能）
+- export defaultは書かない
+- スタイルはインラインstyleオブジェクトを使う（例: style={{ color: 'red' }}）
+- 使えるのはHTML要素（div, button, input, span, p, h1〜h6など）のみ
+- コードブロック（\`\`\`）は使わず、コードのみを返す
+
+出力例：
+function App() {
+  const [count, setCount] = React.useState(0);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 24 }}>
+      <h1 style={{ fontSize: 32 }}>{count}</h1>
+      <button onClick={() => setCount(c => c + 1)} style={{ padding: '8px 24px', fontSize: 18 }}>
+        +1
+      </button>
+    </div>
+  );
+}`;
 
 const MAX_RETRIES = 3;
 
@@ -66,6 +80,17 @@ export async function POST(req: NextRequest) {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Transfer-Encoding": "chunked",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
   });
 }

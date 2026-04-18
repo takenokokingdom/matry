@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +11,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { isGeneratedCode } from "../../shared/lib/code/detect";
+import PreviewScreen from "../preview/PreviewScreen";
+import { generateApp } from "./api/generate";
+import GeneratingIndicator from "./components/GeneratingIndicator";
 
 type Message = {
   id: string;
@@ -22,9 +27,11 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     const text = input.trim();
     if (!text || loading) return;
 
@@ -39,61 +46,69 @@ export default function ChatScreen() {
     setLoading(true);
 
     const assistantId = (Date.now() + 1).toString();
+    setGeneratingId(assistantId);
     setMessages((prev) => [
       ...prev,
       { id: assistantId, role: "assistant", content: "", streaming: true },
     ]);
 
-    try {
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/api/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text }),
-        },
-      );
-
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
+    generateApp(text, {
+      onProgress: (accumulated) => {
+        if (!isGeneratedCode(accumulated)) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: accumulated } : m,
+            ),
+          );
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }
+      },
+      onDone: (accumulated) => {
+        setGeneratingId(null);
+        if (isGeneratedCode(accumulated)) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: "アプリを生成しました！", streaming: false }
+                : m,
+            ),
+          );
+          setPreviewCode(accumulated);
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, streaming: false } : m,
+            ),
+          );
+        }
+        setLoading(false);
+      },
+      onError: () => {
+        setGeneratingId(null);
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantId ? { ...m, content: accumulated } : m,
+            m.id === assistantId
+              ? { ...m, content: "エラーが発生しました。", streaming: false }
+              : m,
           ),
         );
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }
-
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, streaming: false } : m,
-        ),
-      );
-    } catch (e) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: "エラーが発生しました。", streaming: false }
-            : m,
-        ),
-      );
-    } finally {
-      setLoading(false);
-    }
+        setLoading(false);
+      },
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Matry</Text>
+        {previewCode && !loading && (
+          <Pressable
+            style={styles.previewButton}
+            onPress={() => setPreviewCode(previewCode)}
+          >
+            <Text style={styles.previewButtonText}>▶ プレビュー</Text>
+          </Pressable>
+        )}
       </View>
       <KeyboardAvoidingView
         style={styles.flex}
@@ -112,12 +127,16 @@ export default function ChatScreen() {
                 item.role === "user" ? styles.userBubble : styles.aiBubble,
               ]}
             >
-              <Text
-                style={item.role === "user" ? styles.userText : styles.aiText}
-              >
-                {item.content}
-                {item.streaming ? "▍" : ""}
-              </Text>
+              {item.streaming && item.id === generatingId ? (
+                <GeneratingIndicator />
+              ) : (
+                <Text
+                  style={item.role === "user" ? styles.userText : styles.aiText}
+                >
+                  {item.content}
+                  {item.streaming ? "▍" : ""}
+                </Text>
+              )}
             </View>
           )}
           onContentSizeChange={() =>
@@ -144,6 +163,15 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={!!previewCode} animationType="slide">
+        {previewCode && (
+          <PreviewScreen
+            code={previewCode}
+            onClose={() => setPreviewCode(null)}
+          />
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -152,12 +180,22 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: "#fff" },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
+  previewButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  previewButtonText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   messageList: { padding: 16, gap: 12 },
   bubble: {
     maxWidth: "80%",

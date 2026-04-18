@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
+import { saveApp } from "../apps/api/save-app";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
 import MarkdownMessage from "./components/MarkdownMessage";
@@ -25,7 +26,11 @@ type Message = {
   streaming?: boolean;
 };
 
-export default function ChatScreen() {
+type Props = {
+  onBack?: () => void;
+};
+
+export default function ChatScreen({ onBack }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -73,6 +78,10 @@ export default function ChatScreen() {
         onDone: (accumulated) => {
           if (isGeneratedCode(accumulated)) {
             const code = extractCode(accumulated);
+            const title =
+              next.find((m) => m.role === "user")?.content.slice(0, 30) ??
+              "無題のアプリ";
+            saveApp(title, code).catch(() => {});
             setMessages((cur) =>
               cur.map((m) =>
                 m.id === assistantId
@@ -116,7 +125,13 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Matry</Text>
+        {onBack ? (
+          <Pressable onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← ホーム</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.headerTitle}>Matry</Text>
+        )}
         <View style={styles.headerRight}>
           {previewCode && !loading && (
             <Pressable
@@ -215,6 +230,8 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
+  backButton: { paddingVertical: 4 },
+  backButtonText: { fontSize: 15, color: "#007AFF" },
   headerRight: { flexDirection: "row", gap: 8, alignItems: "center" },
   previewButton: {
     backgroundColor: "#007AFF",

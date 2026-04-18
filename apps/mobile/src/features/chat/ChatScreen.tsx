@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { isGeneratedCode } from "../../shared/lib/code/detect";
+import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
@@ -71,19 +71,20 @@ export default function ChatScreen() {
         },
         onDone: (accumulated) => {
           if (isGeneratedCode(accumulated)) {
+            const code = extractCode(accumulated);
             setMessages((cur) =>
               cur.map((m) =>
                 m.id === assistantId
                   ? {
                       ...m,
                       content: "アプリを生成しました！",
-                      rawContent: accumulated,
+                      rawContent: code,
                       streaming: false,
                     }
                   : m,
               ),
             );
-            setPreviewCode(accumulated);
+            setPreviewCode(code);
           } else {
             setMessages((cur) =>
               cur.map((m) =>

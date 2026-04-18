@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -20,11 +21,79 @@ type Message = {
   streaming?: boolean;
 };
 
+const isGeneratedCode = (text: string) => text.includes("function App");
+
+function GeneratingIndicator() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+    const a1 = animate(dot1, 0);
+    const a2 = animate(dot2, 150);
+    const a3 = animate(dot3, 300);
+    a1.start();
+    a2.start();
+    a3.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  const dotStyle = (dot: Animated.Value) => ({
+    opacity: dot,
+    transform: [
+      {
+        translateY: dot.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -4],
+        }),
+      },
+    ],
+  });
+
+  return (
+    <View style={styles.generatingRow}>
+      <Text style={styles.generatingLabel}>生成中</Text>
+      {(
+        [
+          ["d1", dot1],
+          ["d2", dot2],
+          ["d3", dot3],
+        ] as const
+      ).map(([key, dot]) => (
+        <Animated.Text key={key} style={[styles.dot, dotStyle(dot)]}>
+          ●
+        </Animated.Text>
+      ))}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const sendMessage = async () => {
@@ -42,6 +111,7 @@ export default function ChatScreen() {
     setLoading(true);
 
     const assistantId = (Date.now() + 1).toString();
+    setGeneratingId(assistantId);
     setMessages((prev) => [
       ...prev,
       { id: assistantId, role: "assistant", content: "", streaming: true },
@@ -56,26 +126,40 @@ export default function ChatScreen() {
 
       xhr.onprogress = () => {
         accumulated = xhr.responseText;
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, content: accumulated } : m,
-          ),
-        );
-        flatListRef.current?.scrollToEnd({ animated: true });
+        if (!isGeneratedCode(accumulated)) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, content: accumulated } : m,
+            ),
+          );
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }
       };
 
       xhr.onload = () => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, streaming: false } : m,
-          ),
-        );
-        setPreviewCode(accumulated);
+        setGeneratingId(null);
+        if (isGeneratedCode(accumulated)) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: "アプリを生成しました！", streaming: false }
+                : m,
+            ),
+          );
+          setPreviewCode(accumulated);
+        } else {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId ? { ...m, streaming: false } : m,
+            ),
+          );
+        }
         setLoading(false);
         resolve();
       };
 
       xhr.onerror = () => {
+        setGeneratingId(null);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
@@ -121,12 +205,16 @@ export default function ChatScreen() {
                 item.role === "user" ? styles.userBubble : styles.aiBubble,
               ]}
             >
-              <Text
-                style={item.role === "user" ? styles.userText : styles.aiText}
-              >
-                {item.content}
-                {item.streaming ? "▍" : ""}
-              </Text>
+              {item.streaming && item.id === generatingId ? (
+                <GeneratingIndicator />
+              ) : (
+                <Text
+                  style={item.role === "user" ? styles.userText : styles.aiText}
+                >
+                  {item.content}
+                  {item.streaming ? "▍" : ""}
+                </Text>
+              )}
             </View>
           )}
           onContentSizeChange={() =>
@@ -197,6 +285,13 @@ const styles = StyleSheet.create({
   aiBubble: { alignSelf: "flex-start", backgroundColor: "#F0F0F0" },
   userText: { color: "#fff", fontSize: 15 },
   aiText: { color: "#000", fontSize: 15 },
+  generatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  generatingLabel: { fontSize: 14, color: "#555" },
+  dot: { fontSize: 8, color: "#555" },
   inputRow: {
     flexDirection: "row",
     padding: 12,

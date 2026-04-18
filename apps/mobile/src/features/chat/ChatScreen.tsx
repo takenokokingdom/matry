@@ -142,6 +142,7 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
+          extraData={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
           renderItem={({ item }) => (
@@ -149,6 +150,9 @@ export default function ChatScreen() {
               style={[
                 styles.bubble,
                 item.role === "user" ? styles.userBubble : styles.aiBubble,
+                item.streaming &&
+                  isGeneratedCode(item.content) &&
+                  styles.codeBubble,
               ]}
             >
               {item.role === "user" ? (
@@ -236,6 +240,11 @@ const styles = StyleSheet.create({
   },
   userBubble: { alignSelf: "flex-end", backgroundColor: "#007AFF" },
   aiBubble: { alignSelf: "flex-start", backgroundColor: "#F0F0F0" },
+  codeBubble: {
+    alignSelf: "stretch",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+  },
   userText: { color: "#fff", fontSize: 15 },
   aiText: { color: "#000", fontSize: 15 },
   inputRow: {

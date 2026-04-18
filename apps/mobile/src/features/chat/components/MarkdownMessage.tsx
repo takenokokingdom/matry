@@ -1,5 +1,7 @@
 import { StyleSheet, Text } from "react-native";
 import Markdown from "react-native-markdown-display";
+import { isGeneratedCode } from "../../../shared/lib/code/detect";
+import CodeGeneratingIndicator from "./CodeGeneratingIndicator";
 
 type Props = {
   content: string;
@@ -7,6 +9,10 @@ type Props = {
 };
 
 export default function MarkdownMessage({ content, streaming }: Props) {
+  if (streaming && isGeneratedCode(content)) {
+    return <CodeGeneratingIndicator content={content} />;
+  }
+
   if (streaming) {
     return (
       <Text style={styles.streamingText}>

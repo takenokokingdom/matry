@@ -9,6 +9,10 @@
     "typecheck": "pnpm --filter web typecheck && pnpm --filter mobile typecheck"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^1.9.4",
+    "supabase": "^2.92.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@biomejs/biome", "supabase"]
   }
 }

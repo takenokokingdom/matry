@@ -14,13 +14,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { isGeneratedCode } from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import PreviewScreen from "../preview/PreviewScreen";
-import { generateApp } from "./api/generate";
-import GeneratingIndicator from "./components/GeneratingIndicator";
+import { type HistoryItem, generateApp } from "./api/generate";
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  rawContent?: string;
   streaming?: boolean;
 };
 
@@ -29,8 +29,12 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+
+  const buildHistory = (msgs: Message[]): HistoryItem[] =>
+    msgs
+      .filter((m) => !m.streaming)
+      .map((m) => ({ role: m.role, content: m.rawContent ?? m.content }));
 
   const sendMessage = () => {
     const text = input.trim();
@@ -42,59 +46,68 @@ export default function ChatScreen() {
       content: text,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
+    setMessages((prev) => {
+      const next = [...prev, userMessage];
 
-    const assistantId = (Date.now() + 1).toString();
-    setGeneratingId(assistantId);
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantId, role: "assistant", content: "", streaming: true },
-    ]);
+      const assistantId = (Date.now() + 1).toString();
+      const history = buildHistory(next);
 
-    generateApp(text, {
-      onProgress: (accumulated) => {
-        if (!isGeneratedCode(accumulated)) {
-          setMessages((prev) =>
-            prev.map((m) =>
+      const withAssistant: Message[] = [
+        ...next,
+        { id: assistantId, role: "assistant", content: "", streaming: true },
+      ];
+
+      setLoading(true);
+      setInput("");
+
+      generateApp(text, history, {
+        onProgress: (accumulated) => {
+          setMessages((cur) =>
+            cur.map((m) =>
               m.id === assistantId ? { ...m, content: accumulated } : m,
             ),
           );
           flatListRef.current?.scrollToEnd({ animated: true });
-        }
-      },
-      onDone: (accumulated) => {
-        setGeneratingId(null);
-        if (isGeneratedCode(accumulated)) {
-          setMessages((prev) =>
-            prev.map((m) =>
+        },
+        onDone: (accumulated) => {
+          if (isGeneratedCode(accumulated)) {
+            setMessages((cur) =>
+              cur.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      content: "アプリを生成しました！",
+                      rawContent: accumulated,
+                      streaming: false,
+                    }
+                  : m,
+              ),
+            );
+            setPreviewCode(accumulated);
+          } else {
+            setMessages((cur) =>
+              cur.map((m) =>
+                m.id === assistantId
+                  ? { ...m, rawContent: accumulated, streaming: false }
+                  : m,
+              ),
+            );
+          }
+          setLoading(false);
+        },
+        onError: () => {
+          setMessages((cur) =>
+            cur.map((m) =>
               m.id === assistantId
-                ? { ...m, content: "アプリを生成しました！", streaming: false }
+                ? { ...m, content: "エラーが発生しました。", streaming: false }
                 : m,
             ),
           );
-          setPreviewCode(accumulated);
-        } else {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, streaming: false } : m,
-            ),
-          );
-        }
-        setLoading(false);
-      },
-      onError: () => {
-        setGeneratingId(null);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: "エラーが発生しました。", streaming: false }
-              : m,
-          ),
-        );
-        setLoading(false);
-      },
+          setLoading(false);
+        },
+      });
+
+      return withAssistant;
     });
   };
 
@@ -136,16 +149,12 @@ export default function ChatScreen() {
                 item.role === "user" ? styles.userBubble : styles.aiBubble,
               ]}
             >
-              {item.streaming && item.id === generatingId ? (
-                <GeneratingIndicator />
-              ) : (
-                <Text
-                  style={item.role === "user" ? styles.userText : styles.aiText}
-                >
-                  {item.content}
-                  {item.streaming ? "▍" : ""}
-                </Text>
-              )}
+              <Text
+                style={item.role === "user" ? styles.userText : styles.aiText}
+              >
+                {item.content}
+                {item.streaming ? "▍" : ""}
+              </Text>
             </View>
           )}
           onContentSizeChange={() =>

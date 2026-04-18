@@ -15,6 +15,7 @@ import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
+import MarkdownMessage from "./components/MarkdownMessage";
 
 type Message = {
   id: string;
@@ -150,12 +151,14 @@ export default function ChatScreen() {
                 item.role === "user" ? styles.userBubble : styles.aiBubble,
               ]}
             >
-              <Text
-                style={item.role === "user" ? styles.userText : styles.aiText}
-              >
-                {item.content}
-                {item.streaming ? "▍" : ""}
-              </Text>
+              {item.role === "user" ? (
+                <Text style={styles.userText}>{item.content}</Text>
+              ) : (
+                <MarkdownMessage
+                  content={item.content}
+                  streaming={item.streaming}
+                />
+              )}
             </View>
           )}
           onContentSizeChange={() =>

@@ -25,11 +25,12 @@ export default function CodeGeneratingIndicator({ content }: Props) {
     ).start();
   }, [shimmer]);
 
+  const codeStart = content.indexOf("function App");
+  const code = codeStart >= 0 ? content.slice(codeStart) : content;
   const lastLine =
-    content
+    code
       .split("\n")
-      .map((l) => l.trimEnd())
-      .filter(Boolean)
+      .filter((l) => l.trim())
       .at(-1) ?? "";
 
   const shimmerOpacity = shimmer.interpolate({
@@ -46,7 +47,7 @@ export default function CodeGeneratingIndicator({ content }: Props) {
         ]}
       />
       <View style={styles.lines}>
-        {([80, 55, 70, 40, 65] as const).map((w) => (
+        {([75, 50, 65] as const).map((w) => (
           <View key={w} style={[styles.skeletonLine, { width: `${w}%` }]} />
         ))}
       </View>
@@ -63,16 +64,16 @@ export default function CodeGeneratingIndicator({ content }: Props) {
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    height: 160,
+    height: 100,
     backgroundColor: "#1e1e1e",
     borderRadius: 8,
     padding: 12,
     justifyContent: "space-between",
     overflow: "hidden",
   },
-  lines: { flex: 1, justifyContent: "space-around", paddingBottom: 8 },
+  lines: { flex: 1, justifyContent: "space-around", paddingBottom: 6 },
   skeletonLine: {
-    height: 10,
+    height: 8,
     backgroundColor: "#3a3a3a",
     borderRadius: 4,
   },
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopWidth: 1,
     borderTopColor: "#333",
-    paddingTop: 8,
+    paddingTop: 6,
   },
   lastLineText: {
     flex: 1,

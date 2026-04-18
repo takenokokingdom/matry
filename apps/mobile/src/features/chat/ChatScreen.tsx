@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { isGeneratedCode } from "../../shared/lib/code/detect";
+import { supabase } from "../../shared/lib/supabase/client";
 import PreviewScreen from "../preview/PreviewScreen";
 import { generateApp } from "./api/generate";
 import GeneratingIndicator from "./components/GeneratingIndicator";
@@ -101,14 +102,22 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Matry</Text>
-        {previewCode && !loading && (
+        <View style={styles.headerRight}>
+          {previewCode && !loading && (
+            <Pressable
+              style={styles.previewButton}
+              onPress={() => setPreviewCode(previewCode)}
+            >
+              <Text style={styles.previewButtonText}>▶ プレビュー</Text>
+            </Pressable>
+          )}
           <Pressable
-            style={styles.previewButton}
-            onPress={() => setPreviewCode(previewCode)}
+            style={styles.logoutButton}
+            onPress={() => supabase.auth.signOut()}
           >
-            <Text style={styles.previewButtonText}>▶ プレビュー</Text>
+            <Text style={styles.logoutButtonText}>ログアウト</Text>
           </Pressable>
-        )}
+        </View>
       </View>
       <KeyboardAvoidingView
         style={styles.flex}
@@ -189,6 +198,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#eee",
   },
   headerTitle: { fontSize: 18, fontWeight: "bold" },
+  headerRight: { flexDirection: "row", gap: 8, alignItems: "center" },
   previewButton: {
     backgroundColor: "#007AFF",
     borderRadius: 16,
@@ -196,6 +206,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   previewButtonText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
+  logoutButton: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  logoutButtonText: { color: "#666", fontSize: 13 },
   messageList: { padding: 16, gap: 12 },
   bubble: {
     maxWidth: "80%",

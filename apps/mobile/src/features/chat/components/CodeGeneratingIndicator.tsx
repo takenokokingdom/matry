@@ -47,7 +47,7 @@ export default function CodeGeneratingIndicator({ content }: Props) {
         ]}
       />
       <View style={styles.lines}>
-        {([75, 50, 65] as const).map((w) => (
+        {([75, 50] as const).map((w) => (
           <View key={w} style={[styles.skeletonLine, { width: `${w}%` }]} />
         ))}
       </View>

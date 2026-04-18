@@ -142,6 +142,7 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
+          extraData={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
           renderItem={({ item }) => (

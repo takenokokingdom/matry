@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowUp,
   Bell,
@@ -61,10 +61,12 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
   const [inputFocused, setInputFocused] = useState(false);
 
   // Tab carousel animation: translateX shifts all icons so active is centered
+  const insets = useSafeAreaInsets();
   const tabContainerX = useRef(new Animated.Value(TAB_CENTER)).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   // Ref so panResponder (created once) always reads current tab index
   const activeTabIdxRef = useRef(0);
+  const setSideMenuVisibleRef = useRef((v: boolean) => setSideMenuVisible(v));
   const inputRef = useRef<TextInput>(null);
 
   const load = useCallback(async () => {
@@ -104,8 +106,12 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
         Math.abs(g.dx) > Math.abs(g.dy) * 1.5 && Math.abs(g.dx) > 10,
       onPanResponderRelease: (_, g) => {
         const cur = activeTabIdxRef.current;
-        if (g.dx < -SWIPE_THRESHOLD) switchTab(cur + 1);
-        else if (g.dx > SWIPE_THRESHOLD) switchTab(cur - 1);
+        if (g.dx < -SWIPE_THRESHOLD) {
+          switchTab(cur + 1);
+        } else if (g.dx > SWIPE_THRESHOLD) {
+          if (cur === 0) setSideMenuVisibleRef.current(true);
+          else switchTab(cur - 1);
+        }
       },
     })
   ).current;
@@ -277,7 +283,7 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
       </View>
 
       {/* Bottom tab bar */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { paddingBottom: insets.bottom }]}>
         {/* Carousel icons */}
         <View style={styles.tabIconArea} pointerEvents="box-none">
           <Animated.View
@@ -416,9 +422,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
   },
 
-  // Tab bar
+  // Tab bar (height is TAB_BAR_HEIGHT + dynamic insets.bottom via inline style)
   tabBar: {
-    height: TAB_BAR_HEIGHT,
+    minHeight: TAB_BAR_HEIGHT,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#eee",

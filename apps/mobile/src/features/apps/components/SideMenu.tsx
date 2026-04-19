@@ -8,13 +8,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Settings, User } from "lucide-react-native";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   onChatHistory: () => void;
   onSettings: () => void;
-  onAccount: () => void;
+  email?: string;
 };
 
 const MENU_WIDTH = Dimensions.get("window").width * 0.72;
@@ -24,7 +25,7 @@ export default function SideMenu({
   onClose,
   onChatHistory,
   onSettings,
-  onAccount,
+  email,
 }: Props) {
   const slideAnim = useRef(new Animated.Value(-MENU_WIDTH)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
@@ -85,14 +86,20 @@ export default function SideMenu({
           </Pressable>
         </View>
 
+        {/* Account row: avatar + email + settings */}
         <View style={styles.menuBottom}>
           <View style={styles.divider} />
-          <Pressable style={styles.menuItem} onPress={onSettings}>
-            <Text style={styles.menuItemText}>設定</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={onAccount}>
-            <Text style={styles.menuItemText}>アカウント</Text>
-          </Pressable>
+          <View style={styles.accountRow}>
+            <View style={styles.avatar}>
+              <User size={16} color="#ABABAB" strokeWidth={2} />
+            </View>
+            <Text style={styles.emailText} numberOfLines={1}>
+              {email ?? ""}
+            </Text>
+            <Pressable onPress={onSettings} hitSlop={8}>
+              <Settings size={20} color="#ABABAB" strokeWidth={2} />
+            </Pressable>
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -137,6 +144,27 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#eee",
     marginHorizontal: 20,
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#E5E5E5",
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  emailText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#ABABAB",
   },
 });

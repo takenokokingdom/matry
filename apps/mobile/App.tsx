@@ -63,6 +63,7 @@ function RootNavigator() {
         <HomeScreen
           onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
           onOpenApp={(app) => navigateTo({ name: "preview", app })}
+          email={session?.user.email}
         />
       )}
     </Animated.View>

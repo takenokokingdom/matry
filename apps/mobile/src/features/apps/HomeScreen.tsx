@@ -1,16 +1,30 @@
+import {
+  ArrowUp,
+  Bell,
+  Clock,
+  FileText,
+  House,
+  Menu,
+  ShoppingBag,
+} from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   FlatList,
+  Keyboard,
+  PanResponder,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   type SavedApp,
   fetchBuiltApps,
@@ -21,32 +35,44 @@ import SideMenu from "./components/SideMenu";
 
 type Tab = "home" | "store" | "history" | "drafts";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "home", label: "ホーム" },
-  { id: "store", label: "ストア" },
-  { id: "history", label: "履歴" },
-  { id: "drafts", label: "ドラフト" },
-];
+const TABS: Tab[] = ["home", "store", "history", "drafts"];
+const TAB_LABELS = ["ホーム", "ストア", "履歴", "ドラフト"];
+const TAB_ICONS = [House, ShoppingBag, Clock, FileText];
 
 const NUM_COLUMNS = 4;
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const ICON_CELL = (SCREEN_WIDTH - 32) / NUM_COLUMNS;
+const TAB_ICON_SIZE = 24;
+const TAB_SPACING = 72;
+const TAB_BAR_HEIGHT = 60;
+// Active icon always sits at horizontal center of screen
+const TAB_CENTER = SCREEN_WIDTH / 2 - TAB_ICON_SIZE / 2;
+const SWIPE_THRESHOLD = 50;
 
 type Props = {
   onNewChat: (initialText: string) => void;
   onOpenApp: (app: SavedApp) => void;
+  email?: string;
 };
 
-export default function HomeScreen({ onNewChat, onOpenApp }: Props) {
-  const [activeTab, setActiveTab] = useState<Tab>("home");
+export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [builtApps, setBuiltApps] = useState<SavedApp[]>([]);
   const [draftApps, setDraftApps] = useState<SavedApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
   const [inputText, setInputText] = useState("");
+  const [inputFocused, setInputFocused] = useState(false);
 
-  const gridOpacity = useRef(new Animated.Value(1)).current;
-  const tabScrollRef = useRef<ScrollView>(null);
+  // Tab carousel animation: translateX shifts all icons so active is centered
+  const insets = useSafeAreaInsets();
+  const tabContainerX = useRef(new Animated.Value(TAB_CENTER)).current;
+  const scrimOpacity = useRef(new Animated.Value(0)).current;
+  // Ref so panResponder (created once) always reads current tab index
+  const activeTabIdxRef = useRef(0);
+  const setSideMenuVisibleRef = useRef((v: boolean) => setSideMenuVisible(v));
+  const inputRef = useRef<TextInput>(null);
+  const kbAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,175 +92,270 @@ export default function HomeScreen({ onNewChat, onOpenApp }: Props) {
     load();
   }, [load]);
 
-  const handleChatFocus = () => {
-    Animated.timing(gridOpacity, {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: insets.bottom is stable after mount
+  useEffect(() => {
+    const onShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        Animated.timing(kbAnim, {
+          toValue: Math.max(0, e.endCoordinates.height - TAB_BAR_HEIGHT),
+          duration: Platform.OS === "ios" ? e.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      },
+    );
+    const onHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      (e) => {
+        Animated.timing(kbAnim, {
+          toValue: 0,
+          duration: Platform.OS === "ios" ? e.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      },
+    );
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [kbAnim, insets.bottom]);
+
+  const switchTab = (idx: number) => {
+    if (idx < 0 || idx >= TABS.length) return;
+    activeTabIdxRef.current = idx;
+    setActiveTabIdx(idx);
+    Animated.spring(tabContainerX, {
+      toValue: TAB_CENTER - idx * TAB_SPACING,
+      tension: 60,
+      friction: 12,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > Math.abs(g.dy) * 1.5 && Math.abs(g.dx) > 10,
+      onPanResponderRelease: (_, g) => {
+        const cur = activeTabIdxRef.current;
+        if (g.dx < -SWIPE_THRESHOLD) {
+          switchTab(cur + 1);
+        } else if (g.dx > SWIPE_THRESHOLD) {
+          if (cur === 0) setSideMenuVisibleRef.current(true);
+          else switchTab(cur - 1);
+        }
+      },
+    }),
+  ).current;
+
+  const handleInputFocus = () => {
+    setInputFocused(true);
+    Animated.timing(scrimOpacity, {
+      toValue: 0.35,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleInputBlur = () => {
+    setInputFocused(false);
+    Animated.timing(scrimOpacity, {
       toValue: 0,
       duration: 180,
       useNativeDriver: true,
-    }).start(() => {
-      onNewChat(inputText);
-    });
+    }).start();
   };
 
   const handleSend = () => {
     if (!inputText.trim()) return;
-    Animated.timing(gridOpacity, {
-      toValue: 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      onNewChat(inputText);
-    });
+    const text = inputText;
+    setInputText("");
+    Keyboard.dismiss();
+    onNewChat(text);
   };
 
-  const handleTabPress = (tab: Tab) => {
-    setActiveTab(tab);
-    const idx = TABS.findIndex((t) => t.id === tab);
-    tabScrollRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
+  const renderContent = () => {
+    switch (TABS[activeTabIdx]) {
+      case "home":
+        return (
+          <FlatList
+            data={builtApps}
+            numColumns={NUM_COLUMNS}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyText}>
+                  まだビルド済みのアプリがありません{"\n"}
+                  下の入力欄からアプリを作ってみましょう！
+                </Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.iconCell}
+                onPress={() => onOpenApp(item)}
+              >
+                <AppIcon
+                  iconName={item.icon_name}
+                  iconImageUrl={item.icon_image_url}
+                  label={item.name ?? item.title}
+                  size={ICON_CELL * 0.7}
+                />
+                <Text style={styles.iconLabel} numberOfLines={1}>
+                  {item.name ?? item.title}
+                </Text>
+              </Pressable>
+            )}
+          />
+        );
+      case "store":
+        return (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>ストアは近日公開予定です</Text>
+          </View>
+        );
+      case "history":
+        return (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>チャット履歴は近日公開予定です</Text>
+          </View>
+        );
+      case "drafts":
+        return (
+          <FlatList
+            data={draftApps}
+            numColumns={NUM_COLUMNS}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.gridContent}
+            columnWrapperStyle={styles.gridRow}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={styles.emptyText}>ドラフトはありません</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.iconCell}
+                onPress={() => onOpenApp(item)}
+              >
+                <AppIcon
+                  iconName={item.icon_name}
+                  iconImageUrl={item.icon_image_url}
+                  label={item.title}
+                  size={ICON_CELL * 0.7}
+                  backgroundColor="#aaa"
+                />
+                <Text style={styles.iconLabel} numberOfLines={1}>
+                  {item.title}
+                </Text>
+              </Pressable>
+            )}
+          />
+        );
+    }
   };
 
-  const renderBuiltGrid = () => (
-    <FlatList
-      data={builtApps}
-      numColumns={NUM_COLUMNS}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.gridContent}
-      columnWrapperStyle={styles.gridRow}
-      scrollEnabled={false}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            まだビルド済みのアプリがありません{"\n"}
-            下の入力欄からアプリを作ってみましょう！
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable style={styles.iconCell} onPress={() => onOpenApp(item)}>
-          <AppIcon
-            iconName={item.icon_name}
-            iconImageUrl={item.icon_image_url}
-            label={item.name ?? item.title}
-            size={ICON_CELL * 0.7}
-          />
-          <Text style={styles.iconLabel} numberOfLines={1}>
-            {item.name ?? item.title}
-          </Text>
-        </Pressable>
-      )}
-    />
-  );
-
-  const renderDraftGrid = () => (
-    <FlatList
-      data={draftApps}
-      numColumns={NUM_COLUMNS}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.gridContent}
-      columnWrapperStyle={styles.gridRow}
-      scrollEnabled={false}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>ドラフトはありません</Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable style={styles.iconCell} onPress={() => onOpenApp(item)}>
-          <AppIcon
-            iconName={item.icon_name}
-            iconImageUrl={item.icon_image_url}
-            label={item.title}
-            size={ICON_CELL * 0.7}
-            backgroundColor="#aaa"
-          />
-          <Text style={styles.iconLabel} numberOfLines={1}>
-            {item.title}
-          </Text>
-        </Pressable>
-      )}
-    />
-  );
-
-  const renderStorePlaceholder = () => (
-    <View style={styles.empty}>
-      <Text style={styles.emptyText}>ストアは近日公開予定です</Text>
-    </View>
-  );
-
-  const renderHistoryPlaceholder = () => (
-    <View style={styles.empty}>
-      <Text style={styles.emptyText}>チャット履歴は近日公開予定です</Text>
-    </View>
-  );
+  const hasText = !!inputText.trim();
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.topBar}>
+      {/* Header */}
+      <View style={styles.header}>
         <Pressable
-          style={styles.hamburger}
+          style={styles.headerBtn}
           onPress={() => setSideMenuVisible(true)}
         >
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
-          <View style={styles.hamburgerLine} />
+          <Menu size={24} color="#141414" strokeWidth={2} />
         </Pressable>
-
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContainer}
-        >
-          {TABS.map((tab) => (
-            <Pressable
-              key={tab.id}
-              style={styles.tab}
-              onPress={() => handleTabPress(tab.id)}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  activeTab === tab.id && styles.tabTextActive,
-                ]}
-              >
-                {tab.label}
-              </Text>
-              {activeTab === tab.id && <View style={styles.tabIndicator} />}
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Text style={styles.headerTitle}>Matry</Text>
+        <Pressable style={styles.headerBtn}>
+          <Bell size={24} color="#141414" strokeWidth={2} />
+        </Pressable>
       </View>
 
-      <Animated.View style={[styles.content, { opacity: gridOpacity }]}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {activeTab === "home" && renderBuiltGrid()}
-          {activeTab === "store" && renderStorePlaceholder()}
-          {activeTab === "history" && renderHistoryPlaceholder()}
-          {activeTab === "drafts" && renderDraftGrid()}
-        </ScrollView>
+      {/* Scrollable content + chat bar, pushed up when keyboard opens */}
+      <Animated.View style={[styles.flex, { paddingBottom: kbAnim }]}>
+        {/* Scrollable content with swipe-to-switch-tab gesture */}
+        <View style={styles.content} {...panResponder.panHandlers}>
+          {renderContent()}
+        </View>
+
+        {/* Scrim — before chatBar so chatBar renders on top */}
+        <Animated.View
+          style={[styles.scrim, { opacity: scrimOpacity }]}
+          pointerEvents={inputFocused ? "auto" : "none"}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => inputRef.current?.blur()}
+          />
+        </Animated.View>
+
+        {/* Chat input bar */}
+        <View style={styles.chatBar}>
+          <TextInput
+            ref={inputRef}
+            style={[styles.chatInput, inputFocused && styles.chatInputFocused]}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="どんなアプリを作りますか？"
+            placeholderTextColor="#aaa"
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+          />
+          <Pressable
+            style={[styles.sendButton, hasText && styles.sendButtonActive]}
+            onPress={handleSend}
+            disabled={!hasText}
+          >
+            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
+          </Pressable>
+        </View>
       </Animated.View>
 
-      <View style={styles.chatBar}>
-        <TextInput
-          style={styles.chatInput}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="どんなアプリを作りますか？"
-          placeholderTextColor="#aaa"
-          onFocus={handleChatFocus}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-        />
-        <Pressable
-          style={[
-            styles.sendButton,
-            !inputText.trim() && styles.sendButtonDisabled,
-          ]}
-          onPress={handleSend}
-          disabled={!inputText.trim()}
-        >
-          <Text style={styles.sendButtonText}>送信</Text>
-        </Pressable>
+      {/* Bottom tab bar */}
+      <View style={[styles.tabBar, { paddingBottom: insets.bottom }]}>
+        {/* Fixed-height content zone (icons, label, dot) */}
+        <View style={styles.tabBarContent}>
+          <View style={styles.tabIconArea} pointerEvents="box-none">
+            <Animated.View
+              style={[
+                styles.tabIconContainer,
+                { transform: [{ translateX: tabContainerX }] },
+              ]}
+            >
+              {TABS.map((tab, i) => {
+                const Icon = TAB_ICONS[i];
+                const isActive = activeTabIdx === i;
+                const dist = Math.abs(i - activeTabIdx);
+                const opacity = dist === 0 ? 1 : dist === 1 ? 0.5 : 0.2;
+                return (
+                  <Pressable
+                    key={tab}
+                    onPress={() => switchTab(i)}
+                    style={[styles.tabIconBtn, { left: i * TAB_SPACING }]}
+                    hitSlop={12}
+                  >
+                    <View style={{ opacity }}>
+                      <Icon
+                        size={TAB_ICON_SIZE}
+                        color={isActive ? "#007AFF" : "#ABABAB"}
+                        strokeWidth={2}
+                      />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+          </View>
+          {/* Active tab label (always centered) */}
+          <Text style={styles.tabActiveLabel}>{TAB_LABELS[activeTabIdx]}</Text>
+          <View style={styles.tabActiveDot} />
+        </View>
       </View>
 
       <SideMenu
@@ -242,7 +363,7 @@ export default function HomeScreen({ onNewChat, onOpenApp }: Props) {
         onClose={() => setSideMenuVisible(false)}
         onChatHistory={() => setSideMenuVisible(false)}
         onSettings={() => setSideMenuVisible(false)}
-        onAccount={() => setSideMenuVisible(false)}
+        email={email}
       />
     </SafeAreaView>
   );
@@ -250,44 +371,29 @@ export default function HomeScreen({ onNewChat, onOpenApp }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
-  topBar: {
+  flex: { flex: 1 },
+
+  // Header
+  header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 4,
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  hamburger: { padding: 12, gap: 5, justifyContent: "center" },
-  hamburgerLine: {
-    width: 22,
-    height: 2,
-    backgroundColor: "#1a1a1a",
-    borderRadius: 1,
+  headerBtn: { padding: 6 },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#007AFF",
+    letterSpacing: 0.2,
   },
-  tabsContainer: {
-    flexDirection: "row",
-    paddingRight: 8,
-  },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    position: "relative",
-  },
-  tabText: { fontSize: 14, color: "#888" },
-  tabTextActive: { color: "#007AFF", fontWeight: "600" },
-  tabIndicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 10,
-    right: 10,
-    height: 2,
-    backgroundColor: "#007AFF",
-    borderRadius: 1,
-  },
+
+  // Content
   content: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingBottom: 16 },
-  gridContent: { padding: 16 },
+  gridContent: { padding: 16, paddingBottom: 8 },
   gridRow: { marginBottom: 8 },
   iconCell: {
     width: ICON_CELL,
@@ -308,10 +414,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
+
+  // Scrim
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+
+  // Chat bar
   chatBar: {
     flexDirection: "row",
-    padding: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: "#eee",
@@ -322,17 +436,76 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: "#ddd",
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
+    color: "#141414",
+    backgroundColor: "#fff",
+  },
+  chatInputFocused: {
+    borderColor: "#007AFF",
+    borderWidth: 2,
   },
   sendButton: {
-    backgroundColor: "#007AFF",
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    backgroundColor: "#aaa",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  sendButtonDisabled: { backgroundColor: "#ddd" },
-  sendButtonText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
+  sendButtonActive: {
+    backgroundColor: "#007AFF",
+  },
+
+  // Tab bar
+  tabBar: {
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  // Fixed 60px zone for icons/label/dot — safe area spacer is a separate sibling view
+  tabBarContent: {
+    height: TAB_BAR_HEIGHT,
+    overflow: "hidden",
+  },
+  tabIconArea: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: TAB_BAR_HEIGHT,
+  },
+  tabIconContainer: {
+    position: "absolute",
+    top: (TAB_BAR_HEIGHT - TAB_ICON_SIZE) / 2 - 8,
+    width: TABS.length * TAB_SPACING,
+    height: TAB_ICON_SIZE,
+  },
+  tabIconBtn: {
+    position: "absolute",
+    width: TAB_ICON_SIZE,
+    height: TAB_ICON_SIZE,
+  },
+  tabActiveLabel: {
+    position: "absolute",
+    bottom: 6,
+    left: 0,
+    right: 0,
+    textAlign: "center",
+    fontSize: 10,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  tabActiveDot: {
+    position: "absolute",
+    bottom: 2,
+    left: "50%" as unknown as number,
+    marginLeft: -2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#007AFF",
+  },
 });

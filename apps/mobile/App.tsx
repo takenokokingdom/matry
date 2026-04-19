@@ -56,6 +56,7 @@ function RootNavigator() {
         <PreviewScreen
           code={screen.app.code}
           onClose={() => navigateTo({ name: "home" })}
+          onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
         />
       )}
 

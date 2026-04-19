@@ -233,6 +233,7 @@ export default function ChatScreen({ onBack, initialText }: Props) {
           <PreviewScreen
             code={previewCode}
             onClose={() => setPreviewCode(null)}
+            onNewChat={() => setPreviewCode(null)}
           />
         )}
       </Modal>

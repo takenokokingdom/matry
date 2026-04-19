@@ -10,7 +10,7 @@ import PreviewScreen from "./src/features/preview/PreviewScreen";
 
 type Screen =
   | { name: "home"; initialTabIdx?: number }
-  | { name: "chat"; initialText?: string }
+  | { name: "chat"; initialText?: string; initialCode?: string }
   | { name: "preview"; app: SavedApp };
 
 function RootNavigator() {
@@ -48,6 +48,7 @@ function RootNavigator() {
       {screen.name === "chat" && (
         <ChatScreen
           initialText={screen.initialText}
+          initialCode={screen.initialCode}
           onBack={() => navigateTo({ name: "home" })}
         />
       )}
@@ -56,7 +57,13 @@ function RootNavigator() {
         <PreviewScreen
           code={screen.app.code}
           onClose={() => navigateTo({ name: "home", initialTabIdx: 3 })}
-          onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
+          onNewChat={(text) =>
+            navigateTo({
+              name: "chat",
+              initialText: text,
+              initialCode: screen.app.code,
+            })
+          }
         />
       )}
 

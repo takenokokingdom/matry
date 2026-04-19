@@ -30,10 +30,26 @@ type Message = {
 type Props = {
   onBack?: () => void;
   initialText?: string;
+  initialCode?: string;
 };
 
-export default function ChatScreen({ onBack, initialText }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatScreen({
+  onBack,
+  initialText,
+  initialCode,
+}: Props) {
+  const seedMessages: Message[] = initialCode
+    ? [
+        {
+          id: "seed-code",
+          role: "assistant",
+          content: "アプリを生成しました！",
+          rawContent: initialCode,
+          streaming: false,
+        },
+      ]
+    : [];
+  const [messages, setMessages] = useState<Message[]>(seedMessages);
   const [input, setInput] = useState(initialText ?? "");
   const [loading, setLoading] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);

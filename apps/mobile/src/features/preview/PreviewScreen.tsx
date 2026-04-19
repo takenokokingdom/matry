@@ -88,6 +88,8 @@ export default function PreviewScreen({
           style={[styles.overlay, { bottom: kbAnim }]}
           pointerEvents="box-none"
         >
+          {/* Scrim */}
+          <View style={styles.scrim} pointerEvents="none" />
           {/* Top row: × (left) + build button (right) */}
           <View
             style={[styles.topRow, { top: insets.top + 12 }]}
@@ -153,6 +155,11 @@ const styles = StyleSheet.create({
 
   overlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.28)",
   },
 
   topRow: {

@@ -1,3 +1,4 @@
+import { ArrowUp } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -263,11 +264,14 @@ export default function ChatScreen({
             onSubmitEditing={sendMessage}
           />
           <Pressable
-            style={[styles.sendButton, loading && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              !loading && input.trim() && styles.sendButtonActive,
+            ]}
             onPress={sendMessage}
-            disabled={loading}
+            disabled={loading || !input.trim()}
           >
-            <Text style={styles.sendButtonText}>送信</Text>
+            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -370,11 +374,13 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   sendButton: {
-    backgroundColor: "#007AFF",
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    backgroundColor: "#aaa",
+    justifyContent: "center",
+    alignItems: "center",
   },
   sendButtonDisabled: { backgroundColor: "#aaa" },
-  sendButtonText: { color: "#fff", fontWeight: "bold" },
+  sendButtonActive: { backgroundColor: "#007AFF" },
 });

@@ -1,4 +1,9 @@
-export const isGeneratedCode = (text: string) => text.includes("function App");
+export const isGeneratedCode = (text: string) => {
+  const idx = text.indexOf("function App");
+  if (idx === -1) return false;
+  // 関数本体 { が存在するときだけアプリコードとみなす
+  return text.indexOf("{", idx) !== -1;
+};
 
 /** レスポンスから会話テキストとアプリコードを分離する */
 export function splitResponse(text: string): {
@@ -34,6 +39,9 @@ export function splitResponse(text: string): {
 export function extractCode(text: string): string {
   const start = text.indexOf("function App");
   if (start === -1) return text;
+
+  // 関数本体 { がなければ抽出不能
+  if (text.indexOf("{", start) === -1) return text;
 
   let depth = 0;
   let inString: string | null = null;

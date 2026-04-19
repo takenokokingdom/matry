@@ -53,10 +53,16 @@ type Props = {
   onNewChat: (initialText: string) => void;
   onOpenApp: (app: SavedApp) => void;
   email?: string;
+  initialTabIdx?: number;
 };
 
-export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
-  const [activeTabIdx, setActiveTabIdx] = useState(0);
+export default function HomeScreen({
+  onNewChat,
+  onOpenApp,
+  email,
+  initialTabIdx = 0,
+}: Props) {
+  const [activeTabIdx, setActiveTabIdx] = useState(initialTabIdx);
   const [builtApps, setBuiltApps] = useState<SavedApp[]>([]);
   const [draftApps, setDraftApps] = useState<SavedApp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,10 +72,12 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
 
   // Tab carousel animation: translateX shifts all icons so active is centered
   const insets = useSafeAreaInsets();
-  const tabContainerX = useRef(new Animated.Value(TAB_CENTER)).current;
+  const tabContainerX = useRef(
+    new Animated.Value(TAB_CENTER - initialTabIdx * TAB_SPACING),
+  ).current;
   const scrimOpacity = useRef(new Animated.Value(0)).current;
   // Ref so panResponder (created once) always reads current tab index
-  const activeTabIdxRef = useRef(0);
+  const activeTabIdxRef = useRef(initialTabIdx);
   const setSideMenuVisibleRef = useRef((v: boolean) => setSideMenuVisible(v));
   const inputRef = useRef<TextInput>(null);
   const kbAnim = useRef(new Animated.Value(0)).current;

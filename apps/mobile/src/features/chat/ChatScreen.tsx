@@ -1,3 +1,4 @@
+import { ArrowUp } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -11,12 +12,17 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
+import {
+  extractCode,
+  isGeneratedCode,
+  splitResponse,
+} from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import { saveApp } from "../apps/api/save-app";
 import BuildSheet from "../apps/components/BuildSheet";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
+import AppCodeChip from "./components/AppCodeChip";
 import MarkdownMessage from "./components/MarkdownMessage";
 
 type Message = {
@@ -24,16 +30,35 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   rawContent?: string;
+  appTitle?: string;
+  isAppCode?: boolean;
   streaming?: boolean;
 };
 
 type Props = {
   onBack?: () => void;
   initialText?: string;
+  initialCode?: string;
 };
 
-export default function ChatScreen({ onBack, initialText }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatScreen({
+  onBack,
+  initialText,
+  initialCode,
+}: Props) {
+  const seedMessages: Message[] = initialCode
+    ? [
+        {
+          id: "seed-code",
+          role: "assistant",
+          content: "アプリを生成しました！",
+          rawContent: initialCode,
+          isAppCode: true,
+          streaming: false,
+        },
+      ]
+    : [];
+  const [messages, setMessages] = useState<Message[]>(seedMessages);
   const [input, setInput] = useState(initialText ?? "");
   const [loading, setLoading] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
@@ -84,11 +109,12 @@ export default function ChatScreen({ onBack, initialText }: Props) {
         },
         onDone: (accumulated) => {
           if (isGeneratedCode(accumulated)) {
-            const code = extractCode(accumulated);
+            const { conversationText, code } = splitResponse(accumulated);
+            const safeCode = code ?? extractCode(accumulated);
             const title =
               next.find((m) => m.role === "user")?.content.slice(0, 30) ??
               "無題のアプリ";
-            saveApp(title, code)
+            saveApp(title, safeCode)
               .then((id) => setSavedAppId(id))
               .catch(() => {});
             setMessages((cur) =>
@@ -96,8 +122,10 @@ export default function ChatScreen({ onBack, initialText }: Props) {
                 m.id === assistantId
                   ? {
                       ...m,
-                      content: "アプリを生成しました！",
-                      rawContent: code,
+                      content: conversationText,
+                      rawContent: safeCode,
+                      appTitle: title,
+                      isAppCode: true,
                       streaming: false,
                     }
                   : m,
@@ -183,26 +211,43 @@ export default function ChatScreen({ onBack, initialText }: Props) {
           extraData={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.bubble,
-                item.role === "user" ? styles.userBubble : styles.aiBubble,
-                item.streaming &&
-                  isGeneratedCode(item.content) &&
-                  styles.codeBubble,
-              ]}
-            >
-              {item.role === "user" ? (
-                <Text style={styles.userText}>{item.content}</Text>
-              ) : (
-                <MarkdownMessage
-                  content={item.content}
-                  streaming={item.streaming}
-                />
-              )}
-            </View>
-          )}
+          renderItem={({ item }) => {
+            if (item.isAppCode && !item.streaming) {
+              return (
+                <View style={styles.appCodeBlock}>
+                  {!!item.content && (
+                    <View style={[styles.bubble, styles.aiBubble]}>
+                      <MarkdownMessage content={item.content} />
+                    </View>
+                  )}
+                  <AppCodeChip
+                    title={item.appTitle}
+                    onOpen={() => setPreviewCode(item.rawContent ?? null)}
+                  />
+                </View>
+              );
+            }
+            return (
+              <View
+                style={[
+                  styles.bubble,
+                  item.role === "user" ? styles.userBubble : styles.aiBubble,
+                  item.streaming &&
+                    isGeneratedCode(item.content) &&
+                    styles.codeBubble,
+                ]}
+              >
+                {item.role === "user" ? (
+                  <Text style={styles.userText}>{item.content}</Text>
+                ) : (
+                  <MarkdownMessage
+                    content={item.content}
+                    streaming={item.streaming}
+                  />
+                )}
+              </View>
+            );
+          }}
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }
@@ -219,11 +264,14 @@ export default function ChatScreen({ onBack, initialText }: Props) {
             onSubmitEditing={sendMessage}
           />
           <Pressable
-            style={[styles.sendButton, loading && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              !loading && input.trim() && styles.sendButtonActive,
+            ]}
             onPress={sendMessage}
-            disabled={loading}
+            disabled={loading || !input.trim()}
           >
-            <Text style={styles.sendButtonText}>送信</Text>
+            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -233,6 +281,7 @@ export default function ChatScreen({ onBack, initialText }: Props) {
           <PreviewScreen
             code={previewCode}
             onClose={() => setPreviewCode(null)}
+            onNewChat={() => setPreviewCode(null)}
           />
         )}
       </Modal>
@@ -291,6 +340,7 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: { color: "#666", fontSize: 13 },
   messageList: { padding: 16, gap: 12 },
+  appCodeBlock: { gap: 8, alignItems: "flex-start" },
   bubble: {
     maxWidth: "80%",
     borderRadius: 16,
@@ -324,11 +374,13 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   sendButton: {
-    backgroundColor: "#007AFF",
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    backgroundColor: "#aaa",
+    justifyContent: "center",
+    alignItems: "center",
   },
   sendButtonDisabled: { backgroundColor: "#aaa" },
-  sendButtonText: { color: "#fff", fontWeight: "bold" },
+  sendButtonActive: { backgroundColor: "#007AFF" },
 });

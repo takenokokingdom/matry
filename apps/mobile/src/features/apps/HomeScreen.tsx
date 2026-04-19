@@ -1,3 +1,12 @@
+import {
+  ArrowUp,
+  Bell,
+  Clock,
+  FileText,
+  House,
+  Menu,
+  ShoppingBag,
+} from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -12,16 +21,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  ArrowUp,
-  Bell,
-  Clock,
-  FileText,
-  House,
-  Menu,
-  ShoppingBag,
-} from "lucide-react-native";
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   type SavedApp,
   fetchBuiltApps,
@@ -85,7 +88,6 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
     }
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally run only on mount
   useEffect(() => {
     load();
   }, [load]);
@@ -143,7 +145,7 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
           else switchTab(cur - 1);
         }
       },
-    })
+    }),
   ).current;
 
   const handleInputFocus = () => {

@@ -26,6 +26,7 @@ type Message = {
   content: string;
   rawContent?: string;
   appTitle?: string;
+  isAppCode?: boolean;
   streaming?: boolean;
 };
 
@@ -47,6 +48,7 @@ export default function ChatScreen({
           role: "assistant",
           content: "アプリを生成しました！",
           rawContent: initialCode,
+          isAppCode: true,
           streaming: false,
         },
       ]
@@ -117,6 +119,7 @@ export default function ChatScreen({
                       content: "アプリを生成しました！",
                       rawContent: code,
                       appTitle: title,
+                      isAppCode: true,
                       streaming: false,
                     }
                   : m,
@@ -203,7 +206,7 @@ export default function ChatScreen({
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
           renderItem={({ item }) => {
-            if (item.rawContent && !item.streaming) {
+            if (item.isAppCode && !item.streaming) {
               return (
                 <AppCodeChip
                   title={item.appTitle}

@@ -187,7 +187,11 @@ src/
 2. **Claudeが仕様をIssue本文に書く**（UI/UX・画面フロー・データモデル・受け入れ条件）
    - FigmaデザインがあればURLを共有 → Figma MCPで読み込んで仕様に反映
 3. **オーナーがIssueを確認・承認する**（「LGTM」などのコメント）
-4. Claudeがfeatureブランチを切って実装する
+4. Claudeがfeatureブランチを切って実装する（**必ず最新のmainから派生させる**）
+   ```bash
+   git checkout main && git pull origin main
+   git checkout -b feature/{issue番号}-xxx
+   ```
 5. ClaudeがPRを作成する
 6. オーナーがレビュー・承認する
 7. ClaudeがPRをマージする

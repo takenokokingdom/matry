@@ -5,6 +5,7 @@ import {
   FlatList,
   Keyboard,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -68,6 +69,7 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
   const activeTabIdxRef = useRef(0);
   const setSideMenuVisibleRef = useRef((v: boolean) => setSideMenuVisible(v));
   const inputRef = useRef<TextInput>(null);
+  const kbAnim = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,6 +89,34 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: insets.bottom is stable after mount
+  useEffect(() => {
+    const onShow = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        Animated.timing(kbAnim, {
+          toValue: Math.max(0, e.endCoordinates.height - TAB_BAR_HEIGHT),
+          duration: Platform.OS === "ios" ? e.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      },
+    );
+    const onHide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      (e) => {
+        Animated.timing(kbAnim, {
+          toValue: 0,
+          duration: Platform.OS === "ios" ? e.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      },
+    );
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, [kbAnim, insets.bottom]);
 
   const switchTab = (idx: number) => {
     if (idx < 0 || idx >= TABS.length) return;
@@ -243,83 +273,87 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
         </Pressable>
       </View>
 
-      {/* Scrollable content with swipe-to-switch-tab gesture */}
-      <View style={styles.content} {...panResponder.panHandlers}>
-        {renderContent()}
-      </View>
+      {/* Scrollable content + chat bar, pushed up when keyboard opens */}
+      <Animated.View style={[styles.flex, { paddingBottom: kbAnim }]}>
+        {/* Scrollable content with swipe-to-switch-tab gesture */}
+        <View style={styles.content} {...panResponder.panHandlers}>
+          {renderContent()}
+        </View>
 
-      {/* Scrim when input is focused */}
-      <Animated.View
-        style={[styles.scrim, { opacity: scrimOpacity }]}
-        pointerEvents={inputFocused ? "auto" : "none"}
-      >
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => inputRef.current?.blur()}
-        />
-      </Animated.View>
-
-      {/* Chat input bar */}
-      <View style={styles.chatBar}>
-        <TextInput
-          ref={inputRef}
-          style={[styles.chatInput, inputFocused && styles.chatInputFocused]}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="どんなアプリを作りますか？"
-          placeholderTextColor="#aaa"
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-        />
-        <Pressable
-          style={[styles.sendButton, hasText && styles.sendButtonActive]}
-          onPress={handleSend}
-          disabled={!hasText}
+        {/* Scrim — before chatBar so chatBar renders on top */}
+        <Animated.View
+          style={[styles.scrim, { opacity: scrimOpacity }]}
+          pointerEvents={inputFocused ? "auto" : "none"}
         >
-          <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
-        </Pressable>
-      </View>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => inputRef.current?.blur()}
+          />
+        </Animated.View>
+
+        {/* Chat input bar */}
+        <View style={styles.chatBar}>
+          <TextInput
+            ref={inputRef}
+            style={[styles.chatInput, inputFocused && styles.chatInputFocused]}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="どんなアプリを作りますか？"
+            placeholderTextColor="#aaa"
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+          />
+          <Pressable
+            style={[styles.sendButton, hasText && styles.sendButtonActive]}
+            onPress={handleSend}
+            disabled={!hasText}
+          >
+            <ArrowUp size={20} color="#fff" strokeWidth={2.5} />
+          </Pressable>
+        </View>
+      </Animated.View>
 
       {/* Bottom tab bar */}
       <View style={[styles.tabBar, { paddingBottom: insets.bottom }]}>
-        {/* Carousel icons */}
-        <View style={styles.tabIconArea} pointerEvents="box-none">
-          <Animated.View
-            style={[
-              styles.tabIconContainer,
-              { transform: [{ translateX: tabContainerX }] },
-            ]}
-          >
-            {TABS.map((tab, i) => {
-              const Icon = TAB_ICONS[i];
-              const isActive = activeTabIdx === i;
-              const dist = Math.abs(i - activeTabIdx);
-              const opacity = dist === 0 ? 1 : dist === 1 ? 0.5 : 0.2;
-              return (
-                <Pressable
-                  key={tab}
-                  onPress={() => switchTab(i)}
-                  style={[styles.tabIconBtn, { left: i * TAB_SPACING }]}
-                  hitSlop={12}
-                >
-                  <View style={{ opacity }}>
-                    <Icon
-                      size={TAB_ICON_SIZE}
-                      color={isActive ? "#007AFF" : "#ABABAB"}
-                      strokeWidth={2}
-                    />
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Animated.View>
+        {/* Fixed-height content zone (icons, label, dot) */}
+        <View style={styles.tabBarContent}>
+          <View style={styles.tabIconArea} pointerEvents="box-none">
+            <Animated.View
+              style={[
+                styles.tabIconContainer,
+                { transform: [{ translateX: tabContainerX }] },
+              ]}
+            >
+              {TABS.map((tab, i) => {
+                const Icon = TAB_ICONS[i];
+                const isActive = activeTabIdx === i;
+                const dist = Math.abs(i - activeTabIdx);
+                const opacity = dist === 0 ? 1 : dist === 1 ? 0.5 : 0.2;
+                return (
+                  <Pressable
+                    key={tab}
+                    onPress={() => switchTab(i)}
+                    style={[styles.tabIconBtn, { left: i * TAB_SPACING }]}
+                    hitSlop={12}
+                  >
+                    <View style={{ opacity }}>
+                      <Icon
+                        size={TAB_ICON_SIZE}
+                        color={isActive ? "#007AFF" : "#ABABAB"}
+                        strokeWidth={2}
+                      />
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+          </View>
+          {/* Active tab label (always centered) */}
+          <Text style={styles.tabActiveLabel}>{TAB_LABELS[activeTabIdx]}</Text>
+          <View style={styles.tabActiveDot} />
         </View>
-
-        {/* Active tab label (always centered) */}
-        <Text style={styles.tabActiveLabel}>{TAB_LABELS[activeTabIdx]}</Text>
-        <View style={styles.tabActiveDot} />
       </View>
 
       <SideMenu
@@ -335,6 +369,7 @@ export default function HomeScreen({ onNewChat, onOpenApp, email }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
+  flex: { flex: 1 },
 
   // Header
   header: {
@@ -422,13 +457,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
   },
 
-  // Tab bar (height is TAB_BAR_HEIGHT + dynamic insets.bottom via inline style)
+  // Tab bar
   tabBar: {
-    minHeight: TAB_BAR_HEIGHT,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#eee",
-    alignItems: "center",
+  },
+  // Fixed 60px zone for icons/label/dot — safe area spacer is a separate sibling view
+  tabBarContent: {
+    height: TAB_BAR_HEIGHT,
     overflow: "hidden",
   },
   tabIconArea: {
@@ -452,6 +489,9 @@ const styles = StyleSheet.create({
   tabActiveLabel: {
     position: "absolute",
     bottom: 6,
+    left: 0,
+    right: 0,
+    textAlign: "center",
     fontSize: 10,
     color: "#007AFF",
     fontWeight: "600",
@@ -459,6 +499,8 @@ const styles = StyleSheet.create({
   tabActiveDot: {
     position: "absolute",
     bottom: 2,
+    left: "50%" as unknown as number,
+    marginLeft: -2,
     width: 4,
     height: 4,
     borderRadius: 2,

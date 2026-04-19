@@ -11,7 +11,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
+import {
+  extractCode,
+  isGeneratedCode,
+  splitResponse,
+} from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import { saveApp } from "../apps/api/save-app";
 import BuildSheet from "../apps/components/BuildSheet";
@@ -104,11 +108,12 @@ export default function ChatScreen({
         },
         onDone: (accumulated) => {
           if (isGeneratedCode(accumulated)) {
-            const code = extractCode(accumulated);
+            const { conversationText, code } = splitResponse(accumulated);
+            const safeCode = code ?? extractCode(accumulated);
             const title =
               next.find((m) => m.role === "user")?.content.slice(0, 30) ??
               "無題のアプリ";
-            saveApp(title, code)
+            saveApp(title, safeCode)
               .then((id) => setSavedAppId(id))
               .catch(() => {});
             setMessages((cur) =>
@@ -116,8 +121,8 @@ export default function ChatScreen({
                 m.id === assistantId
                   ? {
                       ...m,
-                      content: "アプリを生成しました！",
-                      rawContent: code,
+                      content: conversationText,
+                      rawContent: safeCode,
                       appTitle: title,
                       isAppCode: true,
                       streaming: false,
@@ -208,10 +213,17 @@ export default function ChatScreen({
           renderItem={({ item }) => {
             if (item.isAppCode && !item.streaming) {
               return (
-                <AppCodeChip
-                  title={item.appTitle}
-                  onOpen={() => setPreviewCode(item.rawContent ?? null)}
-                />
+                <View style={styles.appCodeBlock}>
+                  {!!item.content && (
+                    <View style={[styles.bubble, styles.aiBubble]}>
+                      <MarkdownMessage content={item.content} />
+                    </View>
+                  )}
+                  <AppCodeChip
+                    title={item.appTitle}
+                    onOpen={() => setPreviewCode(item.rawContent ?? null)}
+                  />
+                </View>
               );
             }
             return (
@@ -324,6 +336,7 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: { color: "#666", fontSize: 13 },
   messageList: { padding: 16, gap: 12 },
+  appCodeBlock: { gap: 8, alignItems: "flex-start" },
   bubble: {
     maxWidth: "80%",
     borderRadius: 16,

@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Settings, User } from "lucide-react-native";
 
 type Props = {
   visible: boolean;

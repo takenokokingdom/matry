@@ -17,6 +17,7 @@ import { saveApp } from "../apps/api/save-app";
 import BuildSheet from "../apps/components/BuildSheet";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
+import AppCodeChip from "./components/AppCodeChip";
 import MarkdownMessage from "./components/MarkdownMessage";
 
 type Message = {
@@ -24,6 +25,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   rawContent?: string;
+  appTitle?: string;
   streaming?: boolean;
 };
 
@@ -114,6 +116,7 @@ export default function ChatScreen({
                       ...m,
                       content: "アプリを生成しました！",
                       rawContent: code,
+                      appTitle: title,
                       streaming: false,
                     }
                   : m,
@@ -199,26 +202,36 @@ export default function ChatScreen({
           extraData={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messageList}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.bubble,
-                item.role === "user" ? styles.userBubble : styles.aiBubble,
-                item.streaming &&
-                  isGeneratedCode(item.content) &&
-                  styles.codeBubble,
-              ]}
-            >
-              {item.role === "user" ? (
-                <Text style={styles.userText}>{item.content}</Text>
-              ) : (
-                <MarkdownMessage
-                  content={item.content}
-                  streaming={item.streaming}
+          renderItem={({ item }) => {
+            if (item.rawContent && !item.streaming) {
+              return (
+                <AppCodeChip
+                  title={item.appTitle}
+                  onOpen={() => setPreviewCode(item.rawContent ?? null)}
                 />
-              )}
-            </View>
-          )}
+              );
+            }
+            return (
+              <View
+                style={[
+                  styles.bubble,
+                  item.role === "user" ? styles.userBubble : styles.aiBubble,
+                  item.streaming &&
+                    isGeneratedCode(item.content) &&
+                    styles.codeBubble,
+                ]}
+              >
+                {item.role === "user" ? (
+                  <Text style={styles.userText}>{item.content}</Text>
+                ) : (
+                  <MarkdownMessage
+                    content={item.content}
+                    streaming={item.streaming}
+                  />
+                )}
+              </View>
+            );
+          }}
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }

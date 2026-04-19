@@ -69,5 +69,8 @@ export function extractCode(text: string): string {
     }
   }
 
+  // 閉じ括弧が見つからなかった（途中で切れた）場合は start 以降を全部返す
+  if (end === start) return text.slice(start);
+
   return text.slice(start, end + 1);
 }

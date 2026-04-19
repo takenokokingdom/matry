@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { extractCode, isGeneratedCode } from "../../shared/lib/code/detect";
 import { supabase } from "../../shared/lib/supabase/client";
 import { saveApp } from "../apps/api/save-app";
+import BuildSheet from "../apps/components/BuildSheet";
 import PreviewScreen from "../preview/PreviewScreen";
 import { type HistoryItem, generateApp } from "./api/generate";
 import MarkdownMessage from "./components/MarkdownMessage";
@@ -28,24 +29,31 @@ type Message = {
 
 type Props = {
   onBack?: () => void;
+  initialText?: string;
 };
 
-export default function ChatScreen({ onBack }: Props) {
+export default function ChatScreen({ onBack, initialText }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialText ?? "");
   const [loading, setLoading] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [savedAppId, setSavedAppId] = useState<string | null>(null);
+  const [buildSheetVisible, setBuildSheetVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally run only on mount
+  useEffect(() => {
+    if (initialText?.trim()) {
+      sendMessageText(initialText.trim());
+    }
+  }, []);
 
   const buildHistory = (msgs: Message[]): HistoryItem[] =>
     msgs
       .filter((m) => !m.streaming)
       .map((m) => ({ role: m.role, content: m.rawContent ?? m.content }));
 
-  const sendMessage = () => {
-    const text = input.trim();
-    if (!text || loading) return;
-
+  const sendMessageText = (text: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
@@ -54,7 +62,6 @@ export default function ChatScreen({ onBack }: Props) {
 
     setMessages((prev) => {
       const next = [...prev, userMessage];
-
       const assistantId = (Date.now() + 1).toString();
       const history = buildHistory(next);
 
@@ -81,7 +88,9 @@ export default function ChatScreen({ onBack }: Props) {
             const title =
               next.find((m) => m.role === "user")?.content.slice(0, 30) ??
               "無題のアプリ";
-            saveApp(title, code).catch(() => {});
+            saveApp(title, code)
+              .then((id) => setSavedAppId(id))
+              .catch(() => {});
             setMessages((cur) =>
               cur.map((m) =>
                 m.id === assistantId
@@ -122,6 +131,12 @@ export default function ChatScreen({ onBack }: Props) {
     });
   };
 
+  const sendMessage = () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    sendMessageText(text);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -133,6 +148,14 @@ export default function ChatScreen({ onBack }: Props) {
           <Text style={styles.headerTitle}>Matry</Text>
         )}
         <View style={styles.headerRight}>
+          {savedAppId && !loading && (
+            <Pressable
+              style={styles.buildButton}
+              onPress={() => setBuildSheetVisible(true)}
+            >
+              <Text style={styles.buildButtonText}>ビルドする</Text>
+            </Pressable>
+          )}
           {previewCode && !loading && (
             <Pressable
               style={styles.previewButton}
@@ -213,6 +236,18 @@ export default function ChatScreen({ onBack }: Props) {
           />
         )}
       </Modal>
+
+      {savedAppId && (
+        <BuildSheet
+          visible={buildSheetVisible}
+          appId={savedAppId}
+          onBuilt={(name) => {
+            setBuildSheetVisible(false);
+            setSavedAppId(null);
+          }}
+          onClose={() => setBuildSheetVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -233,6 +268,13 @@ const styles = StyleSheet.create({
   backButton: { paddingVertical: 4 },
   backButtonText: { fontSize: 15, color: "#007AFF" },
   headerRight: { flexDirection: "row", gap: 8, alignItems: "center" },
+  buildButton: {
+    backgroundColor: "#34C759",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  buildButtonText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
   previewButton: {
     backgroundColor: "#007AFF",
     borderRadius: 16,
@@ -263,7 +305,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   userText: { color: "#fff", fontSize: 15 },
-  aiText: { color: "#000", fontSize: 15 },
   inputRow: {
     flexDirection: "row",
     padding: 12,

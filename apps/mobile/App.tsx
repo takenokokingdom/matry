@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { useRef, useState } from "react";
+import { ActivityIndicator, Animated, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import HomeScreen from "./src/features/apps/HomeScreen";
 import type { SavedApp } from "./src/features/apps/api/fetch-apps";
@@ -10,12 +10,28 @@ import PreviewScreen from "./src/features/preview/PreviewScreen";
 
 type Screen =
   | { name: "home" }
-  | { name: "chat" }
+  | { name: "chat"; initialText?: string }
   | { name: "preview"; app: SavedApp };
 
 function RootNavigator() {
   const { session, loading } = useAuth();
   const [screen, setScreen] = useState<Screen>({ name: "home" });
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const navigateTo = (next: Screen) => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start(() => {
+      setScreen(next);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  };
 
   if (loading) {
     return (
@@ -27,24 +43,29 @@ function RootNavigator() {
 
   if (!session) return <AuthScreen />;
 
-  if (screen.name === "chat") {
-    return <ChatScreen onBack={() => setScreen({ name: "home" })} />;
-  }
-
-  if (screen.name === "preview") {
-    return (
-      <PreviewScreen
-        code={screen.app.code}
-        onClose={() => setScreen({ name: "home" })}
-      />
-    );
-  }
-
   return (
-    <HomeScreen
-      onNewApp={() => setScreen({ name: "chat" })}
-      onOpenApp={(app) => setScreen({ name: "preview", app })}
-    />
+    <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+      {screen.name === "chat" && (
+        <ChatScreen
+          initialText={screen.initialText}
+          onBack={() => navigateTo({ name: "home" })}
+        />
+      )}
+
+      {screen.name === "preview" && (
+        <PreviewScreen
+          code={screen.app.code}
+          onClose={() => navigateTo({ name: "home" })}
+        />
+      )}
+
+      {screen.name === "home" && (
+        <HomeScreen
+          onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
+          onOpenApp={(app) => navigateTo({ name: "preview", app })}
+        />
+      )}
+    </Animated.View>
   );
 }
 

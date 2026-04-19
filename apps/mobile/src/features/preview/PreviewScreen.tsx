@@ -71,6 +71,7 @@ export default function PreviewScreen({
   };
 
   const hasText = !!inputText.trim();
+  const eyeBottom = insets.bottom + 12;
 
   return (
     <View style={styles.container}>
@@ -81,15 +82,7 @@ export default function PreviewScreen({
         originWhitelist={["*"]}
       />
 
-      {/* Tap anywhere to restore overlay when hidden */}
-      {!overlayVisible && (
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => setOverlayVisible(true)}
-        />
-      )}
-
-      {/* Overlay UI */}
+      {/* Main overlay (hidden when overlayVisible=false) */}
       {overlayVisible && (
         <Animated.View
           style={[styles.overlay, { bottom: kbAnim }]}
@@ -108,18 +101,11 @@ export default function PreviewScreen({
             </Pressable>
           </View>
 
-          {/* Bottom: eye toggle + chat input */}
+          {/* Chat input row */}
           <View
-            style={[styles.bottomArea, { bottom: insets.bottom + 12 }]}
+            style={[styles.chatArea, { bottom: eyeBottom + 36 + 10 }]}
             pointerEvents="box-none"
           >
-            <Pressable
-              style={[styles.iconBtn, styles.eyeBtn]}
-              onPress={() => setOverlayVisible(false)}
-            >
-              <Eye size={18} color="#fff" strokeWidth={2} />
-            </Pressable>
-
             <View style={styles.chatBar} pointerEvents="box-none">
               <TextInput
                 ref={inputRef}
@@ -127,7 +113,7 @@ export default function PreviewScreen({
                 value={inputText}
                 onChangeText={setInputText}
                 placeholder="どう変更しますか？"
-                placeholderTextColor="rgba(255,255,255,0.6)"
+                placeholderTextColor="#aaa"
                 onSubmitEditing={handleSend}
                 returnKeyType="send"
               />
@@ -136,12 +122,28 @@ export default function PreviewScreen({
                 onPress={handleSend}
                 disabled={!hasText}
               >
-                <ArrowUp size={18} color="#fff" strokeWidth={2.5} />
+                <ArrowUp
+                  size={18}
+                  color={hasText ? "#fff" : "#999"}
+                  strokeWidth={2.5}
+                />
               </Pressable>
             </View>
           </View>
         </Animated.View>
       )}
+
+      {/* Eye button — always visible at fixed position */}
+      <Pressable
+        style={[
+          styles.iconBtn,
+          styles.eyeBtn,
+          { bottom: eyeBottom, opacity: overlayVisible ? 1 : 0.45 },
+        ]}
+        onPress={() => setOverlayVisible((v) => !v)}
+      >
+        <Eye size={18} color="#fff" strokeWidth={2} />
+      </Pressable>
     </View>
   );
 }
@@ -183,15 +185,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  bottomArea: {
+  chatArea: {
     position: "absolute",
     left: 16,
     right: 16,
   },
 
   eyeBtn: {
-    alignSelf: "flex-end",
-    marginBottom: 10,
+    position: "absolute",
+    right: 16,
   },
 
   chatBar: {
@@ -206,17 +208,17 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 20,
     fontSize: 15,
-    color: "#fff",
-    backgroundColor: "rgba(255,255,255,0.18)",
+    color: "#141414",
+    backgroundColor: "rgba(255,255,255,0.92)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: "rgba(0,0,0,0.1)",
   },
 
   sendBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "rgba(200,200,200,0.7)",
     justifyContent: "center",
     alignItems: "center",
   },

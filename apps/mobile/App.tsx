@@ -9,7 +9,7 @@ import ChatScreen from "./src/features/chat/ChatScreen";
 import PreviewScreen from "./src/features/preview/PreviewScreen";
 
 type Screen =
-  | { name: "home" }
+  | { name: "home"; initialTabIdx?: number }
   | { name: "chat"; initialText?: string }
   | { name: "preview"; app: SavedApp };
 
@@ -55,7 +55,7 @@ function RootNavigator() {
       {screen.name === "preview" && (
         <PreviewScreen
           code={screen.app.code}
-          onClose={() => navigateTo({ name: "home" })}
+          onClose={() => navigateTo({ name: "home", initialTabIdx: 3 })}
           onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
         />
       )}
@@ -65,6 +65,7 @@ function RootNavigator() {
           onNewChat={(text) => navigateTo({ name: "chat", initialText: text })}
           onOpenApp={(app) => navigateTo({ name: "preview", app })}
           email={session?.user.email}
+          initialTabIdx={screen.initialTabIdx}
         />
       )}
     </Animated.View>
